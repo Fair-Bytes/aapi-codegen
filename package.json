@@ -1,0 +1,34 @@
+{
+  "name": "aapi-codegen",
+  "version": "0.0.1",
+  "description": "Generate go files from asyncapi spec",
+  "main": "./dist/aapi-codegen.js",
+  "bin": {
+    "menimal": "./dist/aapi-codegen.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "tsx src/aapi-codegen.ts",
+    "bundle": "tsup && tsx scripts/copy-templates.ts"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@asyncapi/parser": "^3.0.10",
+    "commander": "^12.0.0",
+    "eta": "^3.4.0",
+    "underscore": "^1.13.6"
+  },
+  "devDependencies": {
+    "@effect/platform": "^0.48.21",
+    "@effect/platform-node": "^0.45.23",
+    "@types/underscore": "^1.11.15",
+    "effect": "^2.4.15",
+    "tsup": "^8.0.2",
+    "tsx": "^4.7.1",
+    "typescript": "^5.4.3"
+  }
+}
