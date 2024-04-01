@@ -1,10 +1,10 @@
 {
-  "name": "aapi-codegen",
+  "name": "@fair-bytes/aapi-codegen",
   "version": "0.0.1",
   "description": "Generate go files from asyncapi spec",
   "main": "./dist/aapi-codegen.js",
   "bin": {
-    "menimal": "./dist/aapi-codegen.js"
+    "aapi-codegen": "dist/aapi-codegen.js"
   },
   "files": [
     "dist"
@@ -12,10 +12,11 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "tsx src/aapi-codegen.ts",
-    "bundle": "tsup && tsx scripts/copy-templates.ts"
+    "bundle": "tsup && tsx scripts/copy-templates.ts",
+    "release": "npm run bundle && npm publish --access public"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "Christian Froehlecke",
+  "license": "MIT",
   "dependencies": {
     "@asyncapi/parser": "^3.0.10",
     "commander": "^12.0.0",
@@ -30,5 +31,22 @@
     "tsup": "^8.0.2",
     "tsx": "^4.7.1",
     "typescript": "^5.4.3"
-  }
+  },
+  "directories": {
+    "example": "examples"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Fair-Bytes/aapi-codegen.git"
+  },
+  "keywords": [
+    "asyncapi",
+    "golang",
+    "watermill",
+    "generator"
+  ],
+  "bugs": {
+    "url": "https://github.com/Fair-Bytes/aapi-codegen/issues"
+  },
+  "homepage": "https://github.com/Fair-Bytes/aapi-codegen#readme"
 }
