@@ -42,9 +42,9 @@ type Message struct {
 func NewMessage(uuid string, m interface{}) (*Message, error) {
 	var mId string
 	if t := reflect.TypeOf(m); t.Kind() == reflect.Pointer {
-		mId = trimChannel(t.Elem().Name())
+		mId = trimMsg(t.Elem().Name())
 	} else {
-		mId = trimChannel(t.Name())
+		mId = trimMsg(t.Name())
 	}
 
 	data, err := json.Marshal(m)
@@ -79,7 +79,7 @@ func (msg Message) Unmarshal(m interface{}) error {
 		return ErrExpectedPointerType
 	}
 
-	if msg.Id() != trimChannel(mt.Elem().Name()) {
+	if msg.MsgId() != trimMsg(mt.Elem().Name()) {
 		return ErrTypeMismatch
 	}
 
@@ -91,15 +91,15 @@ func (msg Message) Unmarshal(m interface{}) error {
 	}
 }
 
-func trimChannel(s string) string {
-	return strings.Split(s, "_")[1]
+func trimMsg(s string) string {
+	return strings.TrimSuffix(s, "Msg")
 }
 
 func (m Message) UUID() string {
 	return m.msg.UUID
 }
 
-func (m Message) Id() string {
+func (m Message) MsgId() string {
 	return m.msg.Metadata.Get(MessageId)
 }
 
@@ -125,8 +125,16 @@ func (m Message) Nack() bool {
 <% }) %>
 
 <% it.messages.forEach(message => { %>
-// Message <%= message.id %> in channel <%= message.channel %>
-type <%= message.channel %>_<%= message.id %> struct {
+// <%= message.name %> implements message <%= message.id %>
+type <%= message.name %>Msg struct {
 	<%= message.payload %>
+}
+<% }) %>
+
+<% it.messages.forEach(message => { %>
+// <%= message.name %>RecvMsg implements message <%= message.id %> for message received by a channel
+type <%= message.name %>RecvMsg struct {
+	<%= message.name %>Msg
+	Message
 }
 <% }) %>

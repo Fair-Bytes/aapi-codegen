@@ -1,6 +1,6 @@
 import { ChannelInterface, MessageInterface, MessagesInterface, OperationInterface, OperationsInterface, SchemaInterface } from "@asyncapi/parser"
 import { TemplateResult, catchDiagnostics, diagnostic, template } from "./templates"
-import { channelAddressParameters, toMixedCaps } from "./utils"
+import { channelAddressParameters, messageId, toMixedCaps } from "./utils"
 import { uniq } from "underscore"
 
 export type OperationsOptions = {
@@ -16,6 +16,7 @@ export type Receivers = {
     parameters: string[]
     messages: {
         id: string
+        name: string
         channel: string
     }[]
 }[]
@@ -29,6 +30,7 @@ export type Senders = {
     parameters: string[]
     messages: {
         id: string
+        name: string
         channel: string
     }[]
 }[]
@@ -102,8 +104,10 @@ function receivers(receiveOperations: OperationInterface[]): Receivers {
         var messages = receiver.messages()
             .all()
             .map(message => {
+                var msgId = messageId(message)
                 return {
-                    id: toMixedCaps(message.name() ?? message.id()),
+                    id: msgId,
+                    name: toMixedCaps(msgId),
                     channel: toMixedCaps(channel.channel.id())
                 }
             })
@@ -134,8 +138,10 @@ function senders(sendOperations: OperationInterface[]): Senders {
         var messages = sender.messages()
             .all()
             .map(message => {
+                var msgId = messageId(message)
                 return {
-                    id: toMixedCaps(message.name() ?? message.id()),
+                    id: msgId,
+                    name: toMixedCaps(msgId),
                     channel: toMixedCaps(channel.channel.id())
                 }
             })

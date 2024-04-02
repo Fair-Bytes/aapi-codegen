@@ -1,6 +1,6 @@
-import { OperationsInterface, SchemaInterface } from "@asyncapi/parser"
+import { MessageInterface, OperationsInterface, SchemaInterface } from "@asyncapi/parser"
 import { TemplateResult, catchDiagnostics, diagnostic, template } from "./templates"
-import { toMixedCaps } from "./utils"
+import { messageId, toMixedCaps } from "./utils"
 import { uniq } from "underscore"
 
 export type ModelsOptions = {
@@ -23,7 +23,7 @@ export type ModelsData = {
     models: string[]
     messages: {
         id: string
-        channel: string
+        name: string
         payload: string
     }[]
 }
@@ -65,29 +65,30 @@ export default function modelsTemplate(operations: OperationsInterface, opts?: M
         data.models = models
             .map(model => model.implementation)
 
-        // messages
-        data.messages = uniq(operations
+        // Based on the operations of this spec, we
+        // generate the necessary Message from the
+        // different channels. Messages that are
+        // send to or received by multiple channel
+        // are rendered once.
+        data.messages = uniq(
+            operations
             .all()
             .map(operation =>
                 operation
                     .messages()
                     .all()
                     .map(message => {
-                        var msgChannels = operation.channels().all()
-                        if (msgChannels.length !== 1) {
-                            throw diagnostic(`expected exactly one channel for operation ${operation.id()}, got ${msgChannels.length}`)
-                        }
-                        var msgChannel = msgChannels[0]
+                        var id = messageId(message)
 
                         return {
-                            id: toMixedCaps(message.name() ?? message.id()),
-                            channel: toMixedCaps(msgChannel.id()),
+                            id,
+                            name: toMixedCaps(id),
                             payload: toMixedCaps(message.payload()!.id())
                         }
                     })
             )
             .flat()
-        , false, message => `${message.channel}_${message.id}`)
+        , false, message => message.id)
 
         // assert content type
         var unsupportedContentTypes = operations
@@ -274,7 +275,10 @@ function implementProperty(
             break;
     }
     
-    lines = [`${toMixedCaps(name)} ${required ? "" : "*"}${goType} \`json:"${name}${required ? "" : ",omitempty"}"\``]
+    lines = [
+        ...schema.description() ? [`// ${schema.description()}`] : [],
+        `${toMixedCaps(name)} ${required ? "" : "*"}${goType} \`json:"${name}${required ? "" : ",omitempty"}"\``
+    ]
 
     return {
         name: toMixedCaps(name),

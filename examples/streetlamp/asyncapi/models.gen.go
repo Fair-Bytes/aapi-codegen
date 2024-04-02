@@ -10,6 +10,7 @@ import (
 	"github.com/ThreeDotsLabs/watermill/message"
 
 	// Model dependencies
+	"github.com/google/uuid"
 	"time"
 )
 
@@ -40,9 +41,9 @@ type Message struct {
 func NewMessage(uuid string, m interface{}) (*Message, error) {
 	var mId string
 	if t := reflect.TypeOf(m); t.Kind() == reflect.Pointer {
-		mId = trimChannel(t.Elem().Name())
+		mId = trimMsg(t.Elem().Name())
 	} else {
-		mId = trimChannel(t.Name())
+		mId = trimMsg(t.Name())
 	}
 
 	data, err := json.Marshal(m)
@@ -77,7 +78,7 @@ func (msg Message) Unmarshal(m interface{}) error {
 		return ErrExpectedPointerType
 	}
 
-	if msg.Id() != trimChannel(mt.Elem().Name()) {
+	if msg.MsgId() != trimMsg(mt.Elem().Name()) {
 		return ErrTypeMismatch
 	}
 
@@ -89,15 +90,15 @@ func (msg Message) Unmarshal(m interface{}) error {
 	}
 }
 
-func trimChannel(s string) string {
-	return strings.Split(s, "_")[1]
+func trimMsg(s string) string {
+	return strings.TrimSuffix(s, "Msg")
 }
 
 func (m Message) UUID() string {
 	return m.msg.UUID
 }
 
-func (m Message) Id() string {
+func (m Message) MsgId() string {
 	return m.msg.Metadata.Get(MessageId)
 }
 
@@ -123,41 +124,74 @@ type Address struct {
 	City   string `json:"city"`
 }
 
+type StreetlightPayload struct {
+	Id      uuid.UUID `json:"id"`
+	Address Address   `json:"address"`
+}
+
 type LightMeasuredPayload struct {
-	Lumens  *int       `json:"lumens,omitempty"`
-	SentAt  *time.Time `json:"sentAt,omitempty"`
-	Address *Address   `json:"address,omitempty"`
+	// Light intensity measured in lumens.
+	Lumens *int `json:"lumens,omitempty"`
+	// Date and time when the message was sent.
+	SentAt *time.Time `json:"sentAt,omitempty"`
 }
 
 type TurnOnOffPayload struct {
-	Command *string    `json:"command,omitempty"`
-	SentAt  *time.Time `json:"sentAt,omitempty"`
-	Address *Address   `json:"address,omitempty"`
+	// Whether to turn on or off the light.
+	Command *string `json:"command,omitempty"`
+	// Date and time when the message was sent.
+	SentAt *time.Time `json:"sentAt,omitempty"`
 }
 
 type DimLightPoint struct {
-	Percentage *int       `json:"percentage,omitempty"`
-	SentAt     *time.Time `json:"sentAt,omitempty"`
+	// Percentage to which the light should be dimmed to.
+	Percentage *int `json:"percentage,omitempty"`
+	// Date and time when the message was sent.
+	SentAt *time.Time `json:"sentAt,omitempty"`
 }
 
 type DimLightPayload []DimLightPoint
 
-// Message LightMeasured in channel LightingMeasured
-type LightingMeasured_LightMeasured struct {
+// Streetlight implements message streetlight
+type StreetlightMsg struct {
+	StreetlightPayload
+}
+
+// LightMeasured implements message lightMeasured
+type LightMeasuredMsg struct {
 	LightMeasuredPayload
 }
 
-// Message TurnOnOff in channel LightTurnOn
-type LightTurnOn_TurnOnOff struct {
+// TurnOnOff implements message turnOnOff
+type TurnOnOffMsg struct {
 	TurnOnOffPayload
 }
 
-// Message DimLight in channel LightsDim
-type LightsDim_DimLight struct {
+// DimLight implements message dimLight
+type DimLightMsg struct {
 	DimLightPayload
 }
 
-// Message TurnOnOff in channel LightTurnOff
-type LightTurnOff_TurnOnOff struct {
-	TurnOnOffPayload
+// StreetlightRecvMsg implements message streetlight for message received by a channel
+type StreetlightRecvMsg struct {
+	StreetlightMsg
+	Message
+}
+
+// LightMeasuredRecvMsg implements message lightMeasured for message received by a channel
+type LightMeasuredRecvMsg struct {
+	LightMeasuredMsg
+	Message
+}
+
+// TurnOnOffRecvMsg implements message turnOnOff for message received by a channel
+type TurnOnOffRecvMsg struct {
+	TurnOnOffMsg
+	Message
+}
+
+// DimLightRecvMsg implements message dimLight for message received by a channel
+type DimLightRecvMsg struct {
+	DimLightMsg
+	Message
 }

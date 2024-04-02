@@ -6,6 +6,9 @@ package <%= it.package %>
 		.map(channel => channel.parameters.length > 0)
 		.filter(hasParameters => hasParameters)
 		.length > 0
+
+	var hasSubscriber = it.receivers.length > 0
+	var hasPublisher  = it.senders.length > 0
 %>
 
 import (
@@ -28,14 +31,15 @@ var (
 	ErrParameterCouldNotSetValue = errors.New("could not set value on parameter")
 )
 
-type AsyncApiReceiver interface {
+// Receive messages of channels by implementing this interface
+type AsyncApiInterface interface {
 	<% it.receivers.forEach(receiver => { -%>
 		<% receiver.messages.forEach( message => { -%>
+	// Handles operation <%= receiver.id %> with message <%= message.id %> on the <%= message.channel %> channel
 			<% if (receiver.parameters.length > 0) { -%>
-	// Handles operation <%= receiver.id %> with message <%= message.id %> on a channel with parameters
-    <%= receiver.id %>_<%= message.id %>(msg Message, payload <%= message.channel %>_<%= message.id %>, parameters <%= message.channel %>Parameters) error 
-    <% } else { %>// Handles operation <%= receiver.id %> with message <%= message.id %>
-    <%= receiver.id %>_<%= message.id %>(msg Message, payload <%= message.channel %>_<%= message.id %>) error 
+    <%= receiver.id %>With<%= message.name %>Msg(msg <%= message.name %>RecvMsg, param <%= message.channel %>Param) error 
+    <%- } else { -%>
+    <%= receiver.id %>With<%= message.name %>Msg(msg <%= message.name %>RecvMsg) error 
 			<%- } %>
 		<%- }) %>
 	<%- }) %>
@@ -43,26 +47,26 @@ type AsyncApiReceiver interface {
 
 // Router plugin with all operations
 type AsyncApi struct {
-    <% if (it.receivers.length > 0) { -%>
-	receiver   AsyncApiReceiver
+    <% if (hasSubscriber) { -%>
+	handlers   AsyncApiInterface
     subscriber message.Subscriber
 	<%- } %>
     
-    <% if (it.senders.length > 0) { -%>
+    <% if (hasPublisher) { -%>
 	publisher  message.Publisher
 	<%- } %>
 
 	router *message.Router
 }
 
-func NewAsyncApi(<% if (it.senders.length > 0) { %>publisher message.Publisher, <% } %><% if (it.receivers.length > 0) { %>subscriber message.Subscriber, receiver AsyncApiReceiver<% } %>) *AsyncApi {
+func NewAsyncApi(<% if (hasPublisher) { %>publisher message.Publisher, <% } %><% if (hasSubscriber) { %>subscriber message.Subscriber, handlers AsyncApiInterface<% } %>) *AsyncApi {
 	return &AsyncApi {
-		<% if (it.senders.length > 0) { -%>
+		<% if (hasPublisher) { -%>
 		publisher: publisher,
 		<%- } -%>
-		<%- if (it.receivers.length > 0) { -%>
+		<%- if (hasSubscriber) { -%>
 		subscriber: subscriber,
-		receiver: receiver,
+		handlers: handlers,
 		<%- } %>
 
 		router: nil,
@@ -77,7 +81,7 @@ func (a *AsyncApi) Plugin(r *message.Router) error {
 		<% if (receiver.parameters.length === 0) { -%>
 	// Handler for receive operation <%= receiver.id %>
 	r.AddNoPublisherHandler(
-            "<%= receiver.id %>Handler",
+            "<%= receiver.channel.address %>Handler",
             "<%= receiver.channel.address %>",
             a.subscriber,
             a.wrapper<%= receiver.id %>,
@@ -89,18 +93,18 @@ func (a *AsyncApi) Plugin(r *message.Router) error {
 }
 
 <% if (parametersExists) { -%>
-// Receiver handlers for channels with parameters 
-<%- it.receivers.forEach(receiver => { -%>
-	<%- if (receiver.parameters.length > 0) { %>
-func (a AsyncApi) Add<%= receiver.id %>ChannelReceiver(parameters <%= receiver.channel.id %>Parameters) (*message.Handler, error) {
+	<%- it.receivers.forEach(receiver => { -%>
+		<%- if (receiver.parameters.length > 0) { %>
+// Subscribes to channel <%= receiver.channel.id %>
+func (a AsyncApi) SubscribeTo<%= receiver.id %>(param <%= receiver.channel.id %>Param) (*message.Handler, error) {
 	if a.router == nil {
 		panic("plugin uninitialised. call router.AddPlugin(asyncApi.Plugin) first")
 	}
 	
-	address := marshalChannelAddress("<%= receiver.channel.address %>", parameters)
+	address := marshalChannelAddress("<%= receiver.channel.address %>", param)
 
 	handler := a.router.AddNoPublisherHandler(
-		fmt.Sprintf("%s_Handler", address),
+		fmt.Sprintf("%sHandler", address),
 		address,
 		a.subscriber,
 		a.wrapper<%= receiver.id %>,
@@ -112,12 +116,12 @@ func (a AsyncApi) Add<%= receiver.id %>ChannelReceiver(parameters <%= receiver.c
 
 	return handler, nil
 }
-	<% } %>
-<% }) %>
+		<% } %>
+	<% }) %>
 
-// Channel parameters
-func marshalChannelAddress(address string, parameters interface{}) string {
-	v := reflect.ValueOf(parameters)
+
+func marshalChannelAddress(address string, param interface{}) string {
+	v := reflect.ValueOf(param)
 	for i := 0; i < v.NumField(); i++ {
 		pName := v.Type().Field(i).Tag.Get("parameter")
 		pValue := v.Field(i).String()
@@ -128,12 +132,12 @@ func marshalChannelAddress(address string, parameters interface{}) string {
 	return address
 }
 
-func unmarshalChannelAddress(channel string, address string, parameters interface{}) error {
-	if t := reflect.TypeOf(parameters); t.Kind() != reflect.Pointer {
+func unmarshalChannelAddress(channel string, address string, param interface{}) error {
+	if t := reflect.TypeOf(param); t.Kind() != reflect.Pointer {
 		return ErrExpectedPointerType
 	}
 
-	pStruct := reflect.ValueOf(parameters).Elem()
+	pStruct := reflect.ValueOf(param).Elem()
 	addressRegex := fmt.Sprintf("^%s$", address)
 	for i := 0; i < pStruct.NumField(); i++ {
 		pName := pStruct.Type().Field(i).Tag.Get("parameter")
@@ -169,7 +173,8 @@ func unmarshalChannelAddress(channel string, address string, parameters interfac
 
 <% it.channels.forEach(channel => { -%>
 	<%- if (channel.parameters.length > 0) { %>
-type <%= channel.id %>Parameters struct {
+// Parameter of channel <%= channel.id %>
+type <%= channel.id %>Param struct {
 	<% channel.parameters.forEach(param => { -%>
 	<%= param.name %> string `parameter:"<%= param.id %>"`
 	<% }) %>
@@ -177,22 +182,35 @@ type <%= channel.id %>Parameters struct {
 	<% } -%>
 <%- }) %>
 
-<% if (it.senders.length > 0) { -%>
-// Send Operation 
-<%- it.senders.forEach(sender => { -%>
-	<%- sender.messages.forEach( message => { -%>
-		<%- if (sender.parameters.length > 0) { %>
-func (a AsyncApi) <%= sender.id %>_<%= message.id %>(uuid string, payload <%= message.channel %>_<%= message.id %>, parameters <%= message.channel %>Parameters) error {
-	msg, err := NewMessage(uuid, payload)
+
+<% if (hasPublisher) { -%> 
+	<%- it.senders.forEach(sender => { -%>
+// Message interface for operation <%= sender.id %>
+type <%= sender.id %>SendMsg interface {
+	visit<%= sender.id %>SendMsg (uuid string) (*Message, error)
+}
+		<%- sender.messages.forEach( message => { -%>
+func (m <%= message.name %>Msg) visit<%= sender.id %>SendMsg(uuid string) (*Message, error) {
+	msg, err := NewMessage(uuid, m)
+	if err != nil {
+		return nil, err
+	}
+	return msg, nil
+}
+		<% }) %>
+// Publish message of operation <%= sender.id %> into channel <%= sender.channel.id %>
+		<%- if (sender.parameters.length > 0) { -%>
+func (a AsyncApi) Publish<%= sender.id %>(uuid string, message <%= sender.id %>SendMsg, param <%= sender.channel.id %>Param) error {
+	msg, err := message.visit<%= sender.id %>SendMsg(uuid)
 	if err != nil {
 		return err
 	}
-	address := marshalChannelAddress("<%= sender.channel.address %>", parameters)
+	address := marshalChannelAddress("<%= sender.channel.address %>", param)
 	return a.publisher.Publish(address, msg.Raw())
 }
-<% } else { %>
-func (a AsyncApi) <%= sender.id %>_<%= message.id %>(uuid string, payload <%= message.channel %>_<%= message.id %>) error {
-	msg, err := NewMessage(uuid, payload)
+			<%- } else { -%>
+func (a AsyncApi) Publish<%= sender.id %>(uuid string, message <%= sender.id %>SendMsg) error {
+	msg, err := message.visit<%= sender.id %>SendMsg(uuid)
 	if err != nil {
 		return err
 	}
@@ -200,12 +218,11 @@ func (a AsyncApi) <%= sender.id %>_<%= message.id %>(uuid string, payload <%= me
 }
 		<% } -%>
 	<% }) -%>
-<% }) -%>
 <% } %>
 
-<% if (it.receivers.length > 0) { -%>
-// Receiver wrapper 
-<%- it.receivers.forEach(receiver => { %>
+<% if (hasSubscriber) { -%>
+	<%- it.receivers.forEach(receiver => { %>
+// Wraps the handler for the receive operation <%= receiver.id %>
 func (a AsyncApi) wrapper<%= receiver.id %>(m *message.Message) error {
 	msg := Message{}
 	if err := msg.Load(m); err != nil {
@@ -215,29 +232,33 @@ func (a AsyncApi) wrapper<%= receiver.id %>(m *message.Message) error {
 	<% if (receiver.parameters.length > 0) { -%>
 	// extract parameters from channel
 	channel := message.SubscribeTopicFromCtx(m.Context())
-	var parameters <%= receiver.channel.id %>Parameters
-	if err := unmarshalChannelAddress(channel, "<%= receiver.channel.address %>", &parameters); err != nil {
+	var param <%= receiver.channel.id %>Param
+	if err := unmarshalChannelAddress(channel, "<%= receiver.channel.address %>", &param); err != nil {
 		return err
 	}
 	<% } %>
 
-	switch msg.Id() {
+	switch msg.MsgId() {
     <% receiver.messages.forEach(message => { -%>
-	case "<%= message.id %>":
-		var payload <%= message.channel %>_<%= message.id %>
+	case "<%= message.name %>":
+		var payload <%= message.name %>Msg
 		if err := msg.Unmarshal(&payload); err != nil {
 			return err
 		}
+		var recvMsg = <%= message.name %>RecvMsg{
+			<%= message.name %>Msg: payload,
+			Message: msg,
+		}
 
-		<% if (receiver.parameters.length === 0) { -%>
-		return a.receiver.<%= receiver.id %>_<%= message.id %>(msg, payload)
+		<%- if (receiver.parameters.length === 0) { -%>
+		return a.handlers.<%= receiver.id %>With<%= message.name %>Msg(recvMsg)
 		<%- } else { -%>
-		return a.receiver.<%= receiver.id %>_<%= message.id %>(msg, payload, parameters)
+		return a.handlers.<%= receiver.id %>With<%= message.name %>Msg(recvMsg, param)
 		<%- } -%>
     <%- }) -%>
 	default:
 		return ErrUnknownMessageId
 	}
 }
-<% }) %>
+	<% }) %>
 <%- } %>

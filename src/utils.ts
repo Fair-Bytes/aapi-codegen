@@ -1,3 +1,5 @@
+import { MessageInterface } from "@asyncapi/parser"
+
 export function stringToUpperCaseStart(s: string): string {
     if (s.length === 0) {
         return ""
@@ -22,4 +24,8 @@ export function channelAddressParameters(addr: string): string[] {
         }
     }
     return parameters
+}
+
+export function messageId(message: MessageInterface): string {
+    return message.name() ?? message.id()
 }

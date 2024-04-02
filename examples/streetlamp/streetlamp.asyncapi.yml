@@ -44,6 +44,12 @@ servers:
       - name: 'visibility:private'
         description: This resource is private and only available to certain users
 channels:
+  streetlights:
+    address: 'smartylighting.streetlights.1.0.streetlights'
+    messages:
+      streetlight:
+        $ref: '#/components/messages/streetlight'
+    description: The topic on which new streetlight are published.
   lightingMeasured:
     address: 'smartylighting.streetlights.1.0.event.{streetlightId}.lighting.measured'
     messages:
@@ -78,6 +84,10 @@ channels:
       streetlightId:
         $ref: '#/components/parameters/streetlightId'
 operations:
+  receiveStreetlights:
+    action: receive
+    channel:
+      $ref: '#/channels/streetlights'
   receiveLightMeasurement:
     action: receive
     channel:
@@ -103,6 +113,14 @@ operations:
       - $ref: '#/components/operationTraits/kafka'
     messages:
       - $ref: '#/channels/lightsDim/messages/dimLight'
+  placeStreetlight:
+    action: send
+    channel:
+      $ref: '#/channels/streetlights'
+    traits:
+      - $ref: '#/components/operationTraits/kafka'
+    messages:
+      - $ref: '#/channels/streetlights/messages/streetlight'
   lightMeasurement:
     action: send
     channel:
@@ -138,6 +156,16 @@ operations:
       - $ref: '#/channels/lightsDim/messages/dimLight'
 components:
   messages:
+    streetlight:
+      name: streetlight
+      title: Streetlight
+      summary: >-
+        Inform about streetlight parameter.
+      contentType: application/json
+      traits:
+        - $ref: '#/components/messageTraits/commonHeaders'
+      payload:
+        $ref: '#/components/schemas/streetlightPayload'
     lightMeasured:
       name: lightMeasured
       title: Light measured
@@ -166,6 +194,18 @@ components:
       payload:
         $ref: '#/components/schemas/dimLightPayload'
   schemas:
+    streetlightPayload:
+      type: object
+      x-parser-schema-id: streetlightPayload
+      properties: 
+        id:
+          type: string
+          format: uuid
+        address:
+          $ref: '#/components/schemas/address'
+      required:
+        - id
+        - address
     address:
       type: object
       x-parser-schema-id: address
@@ -187,8 +227,6 @@ components:
           description: Light intensity measured in lumens.
         sentAt:
           $ref: '#/components/schemas/sentAt'
-        address:
-          $ref: '#/components/schemas/address'
     turnOnOffPayload:
       type: object
       x-parser-schema-id: turnOnOffPayload
@@ -201,8 +239,6 @@ components:
           description: Whether to turn on or off the light.
         sentAt:
           $ref: '#/components/schemas/sentAt'
-        address:
-          $ref: '#/components/schemas/address'
     dimLightPayload:
       type: array
       x-parser-schema-id: dimLightPayload
