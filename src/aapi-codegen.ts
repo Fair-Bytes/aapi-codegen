@@ -8,6 +8,7 @@ import modelsTemplate from "./models"
 import { writeFileSync } from "fs"
 import { Command } from 'commander';
 import { exec } from 'child_process';
+import { addGenericTemplateData } from "./utils"
 
 const program = new Command();
 
@@ -80,7 +81,8 @@ function proccessArgs(): Options {
             process.exit(1)
         }
         
-        var modelContent = eta.render(models.template.source, models.template.data)
+        var data = addGenericTemplateData(models.template.data)
+        var modelContent = eta.render(models.template.source, data)
         writeFileSync(opts.models, modelContent)
 
         // Post processing
@@ -99,7 +101,8 @@ function proccessArgs(): Options {
             process.exit(1)
         }
         
-        var operationsContent = eta.render(operations.template.source, operations.template.data)
+        var data = addGenericTemplateData(operations.template.data)
+        var operationsContent = eta.render(operations.template.source, data)
         writeFileSync(opts.operations, operationsContent)
 
         // Post processing

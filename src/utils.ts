@@ -29,3 +29,11 @@ export function channelAddressParameters(addr: string): string[] {
 export function messageId(message: MessageInterface): string {
     return message.name() ?? message.id()
 }
+
+export function addGenericTemplateData(orig: any): any {
+    var packageJson = require('../package.json');
+    return {
+        ...orig,
+        aapiCodegenVersion: packageJson.version
+    }
+}
