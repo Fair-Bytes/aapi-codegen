@@ -45,7 +45,7 @@ func sendTestMessages(a *asyncapi.AsyncApi, streetlightId uuid.UUID) {
 	for {
 		lumens += 10
 		now := time.Now()
-		err := a.PublishLightMeasurement(uuid.NewString(), asyncapi.LightMeasuredMsg{
+		err := a.PublishLightMeasurement(uuid.NewString(), asyncapi.LightMeasuredMsgPayload{
 			LightMeasuredPayload: asyncapi.LightMeasuredPayload{
 				Lumens: &lumens,
 				SentAt: &now,
@@ -63,7 +63,7 @@ func sendTestMessages(a *asyncapi.AsyncApi, streetlightId uuid.UUID) {
 
 func placeStreetlightAfterDelay(a *asyncapi.AsyncApi, streetlightId uuid.UUID) {
 	time.Sleep(7 * time.Second)
-	err := a.PublishPlaceStreetlight(uuid.NewString(), asyncapi.StreetlightMsg{
+	err := a.PublishPlaceStreetlight(uuid.NewString(), asyncapi.StreetlightMsgPayload{
 		StreetlightPayload: asyncapi.StreetlightPayload{
 			Id: streetlightId,
 			Address: asyncapi.Address{
@@ -83,10 +83,14 @@ type handlers struct {
 
 // Handles operation ReceiveStreetlights with message streetlight on the Streetlights channel
 func (h handlers) ReceiveStreetlightsWithStreetlightMsg(msg asyncapi.StreetlightRecvMsg) error {
-	log.Printf("[NEW] Streetlight %s was placed in %s, %s\n", msg.Id.String(), msg.Address.Street, msg.Address.City)
+	payload, err := msg.UnmarshalPayload()
+	if err != nil {
+		return err
+	}
+	log.Printf("[NEW] Streetlight %s was placed in %s, %s\n", payload.Id.String(), payload.Address.Street, payload.Address.City)
 
-	_, err := h.api.SubscribeToReceiveLightMeasurement(asyncapi.LightingMeasuredParam{
-		StreetlightId: msg.Id.String(),
+	_, err = h.api.SubscribeToReceiveLightMeasurement(asyncapi.LightingMeasuredParam{
+		StreetlightId: payload.Id.String(),
 	})
 	if err != nil {
 		log.Println(err)
@@ -100,22 +104,34 @@ func (h handlers) ReceiveStreetlightsWithStreetlightMsg(msg asyncapi.Streetlight
 
 // Handles operation ReceiveLightMeasurement with message lightMeasured on the LightingMeasured channel
 func (handlers) ReceiveLightMeasurementWithLightMeasuredMsg(msg asyncapi.LightMeasuredRecvMsg, param asyncapi.LightingMeasuredParam) error {
-	log.Printf("[Measurement] Streetlight %s: %d at %s\n", param.StreetlightId, *msg.Lumens, msg.SentAt.Format(time.RFC3339))
+	payload, err := msg.UnmarshalPayload()
+	if err != nil {
+		return err
+	}
+	log.Printf("[Measurement] Streetlight %s: %d at %s\n", param.StreetlightId, *payload.Lumens, payload.SentAt.Format(time.RFC3339))
 	msg.Ack()
 	return nil
 }
 
 // Handles operation ReceiveTurnOn with message turnOnOff on the LightTurnOn channel
 func (handlers) ReceiveTurnOnWithTurnOnOffMsg(msg asyncapi.TurnOnOffRecvMsg, param asyncapi.LightTurnOnParam) error {
-	log.Printf("[ON] Streetlight %s: %s\n", param.StreetlightId, *msg.Command)
+	payload, err := msg.UnmarshalPayload()
+	if err != nil {
+		return err
+	}
+	log.Printf("[ON] Streetlight %s: %s\n", param.StreetlightId, *payload.Command)
 	msg.Ack()
 	return nil
 }
 
 // Handles operation ReceiveDimLight with message dimLight on the LightsDim channel
 func (handlers) ReceiveDimLightWithDimLightMsg(msg asyncapi.DimLightRecvMsg, param asyncapi.LightsDimParam) error {
+	payload, err := msg.UnmarshalPayload()
+	if err != nil {
+		return err
+	}
 	log.Printf("[DIM] Streetlight %s:\n", param.StreetlightId)
-	for _, dimLightPoint := range msg.DimLightPayload {
+	for _, dimLightPoint := range payload.DimLightPayload {
 		log.Panicf("\t%d at %s\n", dimLightPoint.Percentage, dimLightPoint.SentAt.Format(time.RFC3339))
 	}
 	msg.Ack()

@@ -190,7 +190,7 @@ type <%= sender.id %>SendMsg interface {
 	visit<%= sender.id %>SendMsg (uuid string) (*Message, error)
 }
 		<%- sender.messages.forEach( message => { -%>
-func (m <%= message.name %>Msg) visit<%= sender.id %>SendMsg(uuid string) (*Message, error) {
+func (m <%= message.name %>MsgPayload) visit<%= sender.id %>SendMsg(uuid string) (*Message, error) {
 	msg, err := NewMessage(uuid, m)
 	if err != nil {
 		return nil, err
@@ -241,12 +241,7 @@ func (a AsyncApi) wrapper<%= receiver.id %>(m *message.Message) error {
 	switch msg.MsgId() {
     <% receiver.messages.forEach(message => { -%>
 	case "<%= message.name %>":
-		var payload <%= message.name %>Msg
-		if err := msg.Unmarshal(&payload); err != nil {
-			return err
-		}
 		var recvMsg = <%= message.name %>RecvMsg{
-			<%= message.name %>Msg: payload,
 			Message: msg,
 		}
 

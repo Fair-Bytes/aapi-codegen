@@ -211,7 +211,7 @@ type PlaceStreetlightSendMsg interface {
 	visitPlaceStreetlightSendMsg(uuid string) (*Message, error)
 }
 
-func (m StreetlightMsg) visitPlaceStreetlightSendMsg(uuid string) (*Message, error) {
+func (m StreetlightMsgPayload) visitPlaceStreetlightSendMsg(uuid string) (*Message, error) {
 	msg, err := NewMessage(uuid, m)
 	if err != nil {
 		return nil, err
@@ -233,7 +233,7 @@ type LightMeasurementSendMsg interface {
 	visitLightMeasurementSendMsg(uuid string) (*Message, error)
 }
 
-func (m LightMeasuredMsg) visitLightMeasurementSendMsg(uuid string) (*Message, error) {
+func (m LightMeasuredMsgPayload) visitLightMeasurementSendMsg(uuid string) (*Message, error) {
 	msg, err := NewMessage(uuid, m)
 	if err != nil {
 		return nil, err
@@ -256,7 +256,7 @@ type TurnOnSendMsg interface {
 	visitTurnOnSendMsg(uuid string) (*Message, error)
 }
 
-func (m TurnOnOffMsg) visitTurnOnSendMsg(uuid string) (*Message, error) {
+func (m TurnOnOffMsgPayload) visitTurnOnSendMsg(uuid string) (*Message, error) {
 	msg, err := NewMessage(uuid, m)
 	if err != nil {
 		return nil, err
@@ -279,7 +279,7 @@ type TurnOffSendMsg interface {
 	visitTurnOffSendMsg(uuid string) (*Message, error)
 }
 
-func (m TurnOnOffMsg) visitTurnOffSendMsg(uuid string) (*Message, error) {
+func (m TurnOnOffMsgPayload) visitTurnOffSendMsg(uuid string) (*Message, error) {
 	msg, err := NewMessage(uuid, m)
 	if err != nil {
 		return nil, err
@@ -302,7 +302,7 @@ type DimLightSendMsg interface {
 	visitDimLightSendMsg(uuid string) (*Message, error)
 }
 
-func (m DimLightMsg) visitDimLightSendMsg(uuid string) (*Message, error) {
+func (m DimLightMsgPayload) visitDimLightSendMsg(uuid string) (*Message, error) {
 	msg, err := NewMessage(uuid, m)
 	if err != nil {
 		return nil, err
@@ -329,13 +329,8 @@ func (a AsyncApi) wrapperReceiveStreetlights(m *message.Message) error {
 
 	switch msg.MsgId() {
 	case "Streetlight":
-		var payload StreetlightMsg
-		if err := msg.Unmarshal(&payload); err != nil {
-			return err
-		}
 		var recvMsg = StreetlightRecvMsg{
-			StreetlightMsg: payload,
-			Message:        msg,
+			Message: msg,
 		}
 
 		return a.handlers.ReceiveStreetlightsWithStreetlightMsg(recvMsg)
@@ -360,13 +355,8 @@ func (a AsyncApi) wrapperReceiveLightMeasurement(m *message.Message) error {
 
 	switch msg.MsgId() {
 	case "LightMeasured":
-		var payload LightMeasuredMsg
-		if err := msg.Unmarshal(&payload); err != nil {
-			return err
-		}
 		var recvMsg = LightMeasuredRecvMsg{
-			LightMeasuredMsg: payload,
-			Message:          msg,
+			Message: msg,
 		}
 
 		return a.handlers.ReceiveLightMeasurementWithLightMeasuredMsg(recvMsg, param)
@@ -391,13 +381,8 @@ func (a AsyncApi) wrapperReceiveTurnOn(m *message.Message) error {
 
 	switch msg.MsgId() {
 	case "TurnOnOff":
-		var payload TurnOnOffMsg
-		if err := msg.Unmarshal(&payload); err != nil {
-			return err
-		}
 		var recvMsg = TurnOnOffRecvMsg{
-			TurnOnOffMsg: payload,
-			Message:      msg,
+			Message: msg,
 		}
 
 		return a.handlers.ReceiveTurnOnWithTurnOnOffMsg(recvMsg, param)
@@ -422,13 +407,8 @@ func (a AsyncApi) wrapperReceiveDimLight(m *message.Message) error {
 
 	switch msg.MsgId() {
 	case "DimLight":
-		var payload DimLightMsg
-		if err := msg.Unmarshal(&payload); err != nil {
-			return err
-		}
 		var recvMsg = DimLightRecvMsg{
-			DimLightMsg: payload,
-			Message:     msg,
+			Message: msg,
 		}
 
 		return a.handlers.ReceiveDimLightWithDimLightMsg(recvMsg, param)

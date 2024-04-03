@@ -41,9 +41,9 @@ type Message struct {
 func NewMessage(uuid string, m interface{}) (*Message, error) {
 	var mId string
 	if t := reflect.TypeOf(m); t.Kind() == reflect.Pointer {
-		mId = trimMsg(t.Elem().Name())
+		mId = trimMsgPayload(t.Elem().Name())
 	} else {
-		mId = trimMsg(t.Name())
+		mId = trimMsgPayload(t.Name())
 	}
 
 	data, err := json.Marshal(m)
@@ -78,7 +78,7 @@ func (msg Message) Unmarshal(m interface{}) error {
 		return ErrExpectedPointerType
 	}
 
-	if msg.MsgId() != trimMsg(mt.Elem().Name()) {
+	if msg.MsgId() != trimMsgPayload(mt.Elem().Name()) {
 		return ErrTypeMismatch
 	}
 
@@ -90,8 +90,8 @@ func (msg Message) Unmarshal(m interface{}) error {
 	}
 }
 
-func trimMsg(s string) string {
-	return strings.TrimSuffix(s, "Msg")
+func trimMsgPayload(s string) string {
+	return strings.TrimSuffix(s, "MsgPayload")
 }
 
 func (m Message) UUID() string {
@@ -152,46 +152,74 @@ type DimLightPoint struct {
 
 type DimLightPayload []DimLightPoint
 
-// Streetlight implements message streetlight
-type StreetlightMsg struct {
+// StreetlightMsgPayload implements message streetlight
+type StreetlightMsgPayload struct {
 	StreetlightPayload
 }
 
-// LightMeasured implements message lightMeasured
-type LightMeasuredMsg struct {
+// LightMeasuredMsgPayload implements message lightMeasured
+type LightMeasuredMsgPayload struct {
 	LightMeasuredPayload
 }
 
-// TurnOnOff implements message turnOnOff
-type TurnOnOffMsg struct {
+// TurnOnOffMsgPayload implements message turnOnOff
+type TurnOnOffMsgPayload struct {
 	TurnOnOffPayload
 }
 
-// DimLight implements message dimLight
-type DimLightMsg struct {
+// DimLightMsgPayload implements message dimLight
+type DimLightMsgPayload struct {
 	DimLightPayload
 }
 
 // StreetlightRecvMsg implements message streetlight for message received by a channel
 type StreetlightRecvMsg struct {
-	StreetlightMsg
 	Message
+}
+
+func (m StreetlightRecvMsg) UnmarshalPayload() (StreetlightMsgPayload, error) {
+	var payload StreetlightMsgPayload
+	if err := m.Unmarshal(&payload); err != nil {
+		return StreetlightMsgPayload{}, err
+	}
+	return payload, nil
 }
 
 // LightMeasuredRecvMsg implements message lightMeasured for message received by a channel
 type LightMeasuredRecvMsg struct {
-	LightMeasuredMsg
 	Message
+}
+
+func (m LightMeasuredRecvMsg) UnmarshalPayload() (LightMeasuredMsgPayload, error) {
+	var payload LightMeasuredMsgPayload
+	if err := m.Unmarshal(&payload); err != nil {
+		return LightMeasuredMsgPayload{}, err
+	}
+	return payload, nil
 }
 
 // TurnOnOffRecvMsg implements message turnOnOff for message received by a channel
 type TurnOnOffRecvMsg struct {
-	TurnOnOffMsg
 	Message
+}
+
+func (m TurnOnOffRecvMsg) UnmarshalPayload() (TurnOnOffMsgPayload, error) {
+	var payload TurnOnOffMsgPayload
+	if err := m.Unmarshal(&payload); err != nil {
+		return TurnOnOffMsgPayload{}, err
+	}
+	return payload, nil
 }
 
 // DimLightRecvMsg implements message dimLight for message received by a channel
 type DimLightRecvMsg struct {
-	DimLightMsg
 	Message
+}
+
+func (m DimLightRecvMsg) UnmarshalPayload() (DimLightMsgPayload, error) {
+	var payload DimLightMsgPayload
+	if err := m.Unmarshal(&payload); err != nil {
+		return DimLightMsgPayload{}, err
+	}
+	return payload, nil
 }
