@@ -49,6 +49,12 @@ type AsyncApiInterface interface {
 	<%- }) %>
 }
 
+<% if (hasPublisher && !usePostbox) { -%>
+type Publisher struct {
+	publisher  message.Publisher
+}
+<%- } %>
+
 // Router plugin with all operations
 type AsyncApi struct {
     <% if (hasSubscriber) { -%>
@@ -56,13 +62,11 @@ type AsyncApi struct {
     subscriber message.Subscriber
 	<%- } %>
     
-    <% if (hasPublisher && !usePostbox) { -%>
-	publisher  message.Publisher
-	<%- } %>
-
-	<% if (hasPublisher && usePostbox) { -%>
-	postboxPublisher
+    <% if (hasPublisher) { -%>
+	Publisher
+		<% if (usePostbox) { -%>
 	postboxForwarder *forwarder.Forwarder
+		<%- } %>
 	<%- } %>
 
 	router *message.Router
@@ -73,20 +77,15 @@ func NewAsyncApi(<%-
 	<%- if (hasSubscriber) { -%>, subscriber message.Subscriber, handlers AsyncApiInterface<% } -%>
 	<%- if (hasPublisher && usePostbox) { -%>, postboxConfig PostboxConfig<%- } -%>) (*AsyncApi, error) {
 	<% if (hasPublisher && usePostbox) { -%>
-	if err := postboxConfig.setDefaultsAndValidate(); err != nil {
+	postboxPublisher, err := newPostboxPublisher(publisher, postboxConfig)
+	if err != nil {
 		return nil, err
 	}
 
 	<%- } -%>
 	return &AsyncApi {
-		<% if (hasPublisher && !usePostbox) { -%>
-		publisher: publisher,
-		<%- } -%>
-		<% if (hasPublisher && usePostbox) { -%>
-		postboxPublisher:  postboxPublisher{
-			publisher,
-			postboxConfig,
-		},
+		<% if (hasPublisher) { -%>
+		Publisher: <% if (usePostbox) { -%>postboxPublisher<%- } else { -%>Publisher { publisher }<%- } %>,
 		<%- } %>
 		<%- if (hasSubscriber) { -%>
 		subscriber: subscriber,
@@ -236,7 +235,7 @@ func (m <%= message.name %>MsgPayload) visit<%= sender.id %>SendMsg(uuid string)
 		<% }) %>
 // Publish message of operation <%= sender.id %> into channel <%= sender.channel.id %>
 		<%- if (sender.parameters.length > 0) { -%>
-func (a <%- if(!usePostbox) { -%>AsyncApi<%- } else { -%>postboxPublisher<%- } %>) Publish<%= sender.id %>(uuid string, message <%= sender.id %>SendMsg, param <%= sender.channel.id %>Param) error {
+func (a Publisher) Publish<%= sender.id %>(uuid string, message <%= sender.id %>SendMsg, param <%= sender.channel.id %>Param) error {
 	msg, err := message.visit<%= sender.id %>SendMsg(uuid)
 	if err != nil {
 		return err
@@ -246,7 +245,7 @@ func (a <%- if(!usePostbox) { -%>AsyncApi<%- } else { -%>postboxPublisher<%- } %
 	return a.publisher.Publish(address, msg.Raw())
 }
 			<%- } else { -%>
-func (a <%- if(!usePostbox) { -%>AsyncApi<%- } else { -%>postboxPublisher<%- } %>) Publish<%= sender.id %>(uuid string, message <%= sender.id %>SendMsg) error {
+func (a Publisher) Publish<%= sender.id %>(uuid string, message <%= sender.id %>SendMsg) error {
 	msg, err := message.visit<%= sender.id %>SendMsg(uuid)
 	if err != nil {
 		return err
