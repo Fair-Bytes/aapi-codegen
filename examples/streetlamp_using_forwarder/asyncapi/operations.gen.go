@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/ThreeDotsLabs/watermill/components/forwarder"
+
 	"github.com/ThreeDotsLabs/watermill/message"
 )
 
@@ -39,14 +41,22 @@ type AsyncApi struct {
 	handlers   AsyncApiInterface
 	subscriber message.Subscriber
 
-	publisher message.Publisher
+	postboxPublisher
+	postboxForwarder *forwarder.Forwarder
 
 	router *message.Router
 }
 
-func NewAsyncApi(publisher message.Publisher, subscriber message.Subscriber, handlers AsyncApiInterface) (*AsyncApi, error) {
+func NewAsyncApi(publisher message.Publisher, subscriber message.Subscriber, handlers AsyncApiInterface, postboxConfig PostboxConfig) (*AsyncApi, error) {
+	if err := postboxConfig.setDefaultsAndValidate(); err != nil {
+		return nil, err
+	}
+
 	return &AsyncApi{
-		publisher: publisher,
+		postboxPublisher: postboxPublisher{
+			publisher,
+			postboxConfig,
+		},
 
 		subscriber: subscriber,
 		handlers:   handlers,
@@ -65,6 +75,16 @@ func (a *AsyncApi) Plugin(r *message.Router) error {
 		a.subscriber,
 		a.wrapperReceiveStreetlights,
 	)
+
+	// Forwarder is used to send messages from the sql table to the specified publisher
+	if postboxForwarder, err := forwarder.NewForwarder(a.postboxConfig.Subscriber, a.publisher, a.postboxConfig.Logger, forwarder.Config{
+		ForwarderTopic: a.postboxConfig.PostboxTopic,
+		Router:         r,
+	}); err != nil {
+		return err
+	} else {
+		a.postboxForwarder = postboxForwarder
+	}
 
 	return nil
 }
@@ -221,7 +241,7 @@ func (m StreetlightMsgPayload) visitPlaceStreetlightSendMsg(uuid string) (*Messa
 }
 
 // Publish message of operation PlaceStreetlight into channel Streetlights
-func (a AsyncApi) PublishPlaceStreetlight(uuid string, message PlaceStreetlightSendMsg) error {
+func (a postboxPublisher) PublishPlaceStreetlight(uuid string, message PlaceStreetlightSendMsg) error {
 	msg, err := message.visitPlaceStreetlightSendMsg(uuid)
 	if err != nil {
 		return err
@@ -244,7 +264,7 @@ func (m LightMeasuredMsgPayload) visitLightMeasurementSendMsg(uuid string) (*Mes
 }
 
 // Publish message of operation LightMeasurement into channel LightingMeasured
-func (a AsyncApi) PublishLightMeasurement(uuid string, message LightMeasurementSendMsg, param LightingMeasuredParam) error {
+func (a postboxPublisher) PublishLightMeasurement(uuid string, message LightMeasurementSendMsg, param LightingMeasuredParam) error {
 	msg, err := message.visitLightMeasurementSendMsg(uuid)
 	if err != nil {
 		return err
@@ -268,7 +288,7 @@ func (m TurnOnOffMsgPayload) visitTurnOnSendMsg(uuid string) (*Message, error) {
 }
 
 // Publish message of operation TurnOn into channel LightTurnOn
-func (a AsyncApi) PublishTurnOn(uuid string, message TurnOnSendMsg, param LightTurnOnParam) error {
+func (a postboxPublisher) PublishTurnOn(uuid string, message TurnOnSendMsg, param LightTurnOnParam) error {
 	msg, err := message.visitTurnOnSendMsg(uuid)
 	if err != nil {
 		return err
@@ -292,7 +312,7 @@ func (m TurnOnOffMsgPayload) visitTurnOffSendMsg(uuid string) (*Message, error) 
 }
 
 // Publish message of operation TurnOff into channel LightTurnOff
-func (a AsyncApi) PublishTurnOff(uuid string, message TurnOffSendMsg, param LightTurnOffParam) error {
+func (a postboxPublisher) PublishTurnOff(uuid string, message TurnOffSendMsg, param LightTurnOffParam) error {
 	msg, err := message.visitTurnOffSendMsg(uuid)
 	if err != nil {
 		return err
@@ -316,7 +336,7 @@ func (m DimLightMsgPayload) visitDimLightSendMsg(uuid string) (*Message, error) 
 }
 
 // Publish message of operation DimLight into channel LightsDim
-func (a AsyncApi) PublishDimLight(uuid string, message DimLightSendMsg, param LightsDimParam) error {
+func (a postboxPublisher) PublishDimLight(uuid string, message DimLightSendMsg, param LightsDimParam) error {
 	msg, err := message.visitDimLightSendMsg(uuid)
 	if err != nil {
 		return err

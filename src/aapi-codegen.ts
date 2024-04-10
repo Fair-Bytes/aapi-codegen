@@ -9,6 +9,7 @@ import { writeFileSync } from "fs"
 import { Command } from 'commander';
 import { exec } from 'child_process';
 import { addGenericTemplateData } from "./utils"
+import postboxTemplate from "./postbox"
 
 const program = new Command();
 
@@ -23,23 +24,26 @@ type Options = {
     spec: string,
     package: string,
     models: string | undefined,
-    operations: string | undefined
+    operations: string | undefined,
+    postbox: string | undefined
 }
 
 function proccessArgs(): Options {
     program
         .requiredOption('-p, --package <package>', 'golang package')
-        .requiredOption('-g, --generate <generate>', 'what to generate', 'models,operations')
+        .requiredOption('-g, --generate <generate>', 'what to generate, possible are: models,operations,postbox', 'models,operations')
         .option('-m, --models <models>', 'models file')
         .option('-o, --operations <operations>', 'operations file')
+        .option('-b, --postbox <postbox>', 'postbox file')
         .argument('<asyncapi>')
         .parse()
-
+    
     var opts: Options = {
         spec: program.args[0],
         package: program.opts().package as string,
         operations: program.opts().generate.split(',').includes('operations') ? program.opts().operations as string : undefined,
-        models: program.opts().generate.split(',').includes('models') ? program.opts().models as string : undefined
+        models: program.opts().generate.split(',').includes('models') ? program.opts().models as string : undefined,
+        postbox: program.opts().generate.split(',').includes('postbox') ? program.opts().postbox as string : undefined
     }
 
     if (program.args.length !== 1) {
@@ -86,7 +90,7 @@ function proccessArgs(): Options {
         writeFileSync(opts.models, modelContent)
 
         // Post processing
-        exec(`gofmt -w ${opts.models}`, (error, stdout, stderr) => {
+        exec(`gofmt -w ${opts.models}`, (error, _, stderr) => {
             if (error != null) {
                 console.error(`gofmt failed (${error.code}): ${error.message}`)
                 console.error(stderr)
@@ -102,11 +106,31 @@ function proccessArgs(): Options {
         }
         
         var data = addGenericTemplateData(operations.template.data)
-        var operationsContent = eta.render(operations.template.source, data)
+        var operationsContent = eta.render(operations.template.source, {...data, postbox: !!opts.postbox})
         writeFileSync(opts.operations, operationsContent)
 
         // Post processing
-        exec(`gofmt -w ${opts.operations}`, (error, stdout, stderr) => {
+        exec(`gofmt -w ${opts.operations}`, (error, _, stderr) => {
+            if (error != null) {
+                console.error(`gofmt failed (${error.code}): ${error.message}`)
+                console.error(stderr)
+            }
+        })
+    }
+
+    if (!!opts.postbox) {
+        var postbox = postboxTemplate({ package: opts.package, version })
+        if (postbox.diagnostics !== undefined) {
+            console.error(postbox.diagnostics)
+            process.exit(1)
+        }
+        
+        var data = addGenericTemplateData(postbox.template.data)
+        var operationsContent = eta.render(postbox.template.source, data)
+        writeFileSync(opts.postbox, operationsContent)
+
+        // Post processing
+        exec(`gofmt -w ${opts.postbox}`, (error, _, stderr) => {
             if (error != null) {
                 console.error(`gofmt failed (${error.code}): ${error.message}`)
                 console.error(stderr)

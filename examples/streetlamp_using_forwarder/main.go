@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"log"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/ThreeDotsLabs/watermill/message/router/plugin"
 	"github.com/ThreeDotsLabs/watermill/pubsub/gochannel"
 	"github.com/google/uuid"
+	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/Fair-Bytes/aapi-codegen/examples/streetlamp/asyncapi"
 )
@@ -20,8 +22,16 @@ var (
 
 func main() {
 	pubsub := gochannel.NewGoChannel(gochannel.Config{}, defaultLogger)
+
+	conn, err := sql.Open("pgx", "postgresql://localhost:5432/aapicodegen_db?user=aapicodegen_user&password=aapicodegen_pass")
+	if err != nil {
+		panic(err)
+	}
+
 	h := &handlers{}
-	asyncApi, err := asyncapi.NewAsyncApi(pubsub, pubsub, h)
+	asyncApi, err := asyncapi.NewAsyncApi(pubsub, pubsub, h, asyncapi.PostboxConfig{
+		PostgresDB: conn,
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -37,18 +47,30 @@ func main() {
 
 	streetlightId := uuid.New()
 	go placeStreetlightAfterDelay(asyncApi, streetlightId)
-	go sendTestMessages(asyncApi, streetlightId)
+	go sendTestMessages(asyncApi, streetlightId, conn)
 
-	router.Run(context.Background())
+	if err := router.Run(context.Background()); err != nil {
+		panic(err)
+	}
 }
 
-func sendTestMessages(a *asyncapi.AsyncApi, streetlightId uuid.UUID) {
+func sendTestMessages(a *asyncapi.AsyncApi, streetlightId uuid.UUID, db *sql.DB) {
 	lumens := 0
 
 	for {
+		tx, err := db.Begin()
+		if err != nil {
+			panic(err)
+		}
+
+		pub, err := a.NewTx(tx)
+		if err != nil {
+			panic(err)
+		}
+
 		lumens += 10
 		now := time.Now()
-		err := a.PublishLightMeasurement(uuid.NewString(), asyncapi.LightMeasuredMsgPayload{
+		err = pub.PublishLightMeasurement(uuid.NewString(), asyncapi.LightMeasuredMsgPayload{
 			LightMeasuredPayload: asyncapi.LightMeasuredPayload{
 				Lumens: &lumens,
 				SentAt: &now,
@@ -60,12 +82,15 @@ func sendTestMessages(a *asyncapi.AsyncApi, streetlightId uuid.UUID) {
 			panic(err)
 		}
 
+		tx.Commit()
+
 		time.Sleep(5 * time.Second)
 	}
 }
 
 func placeStreetlightAfterDelay(a *asyncapi.AsyncApi, streetlightId uuid.UUID) {
 	time.Sleep(7 * time.Second)
+
 	err := a.PublishPlaceStreetlight(uuid.NewString(), asyncapi.StreetlightMsgPayload{
 		StreetlightPayload: asyncapi.StreetlightPayload{
 			Id: streetlightId,

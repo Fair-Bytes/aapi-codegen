@@ -1,4 +1,4 @@
-import { MessageInterface, OperationsInterface, SchemaInterface } from "@asyncapi/parser"
+import { OperationsInterface, SchemaInterface } from "@asyncapi/parser"
 import { TemplateResult, catchDiagnostics, diagnostic, template } from "./templates"
 import { messageId, toMixedCaps } from "./utils"
 import { uniq } from "underscore"

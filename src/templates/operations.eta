@@ -9,6 +9,7 @@ package <%= it.package %>
 
 	var hasSubscriber = it.receivers.length > 0
 	var hasPublisher  = it.senders.length > 0
+	var usePostbox = !!it.postbox
 %>
 
 import (
@@ -21,6 +22,9 @@ import (
 	"context"
 	<%- } %>
 
+	<% if (hasPublisher && usePostbox) { -%>
+	"github.com/ThreeDotsLabs/watermill/components/forwarder"
+	<%- } %>
 	"github.com/ThreeDotsLabs/watermill/message"
 )
 
@@ -52,25 +56,45 @@ type AsyncApi struct {
     subscriber message.Subscriber
 	<%- } %>
     
-    <% if (hasPublisher) { -%>
+    <% if (hasPublisher && !usePostbox) { -%>
 	publisher  message.Publisher
+	<%- } %>
+
+	<% if (hasPublisher && usePostbox) { -%>
+	postboxPublisher
+	postboxForwarder *forwarder.Forwarder
 	<%- } %>
 
 	router *message.Router
 }
 
-func NewAsyncApi(<% if (hasPublisher) { %>publisher message.Publisher, <% } %><% if (hasSubscriber) { %>subscriber message.Subscriber, handlers AsyncApiInterface<% } %>) *AsyncApi {
+func NewAsyncApi(<%-
+		if (hasPublisher) { -%>publisher message.Publisher<% } -%>
+	<%- if (hasSubscriber) { -%>, subscriber message.Subscriber, handlers AsyncApiInterface<% } -%>
+	<%- if (hasPublisher && usePostbox) { -%>, postboxConfig PostboxConfig<%- } -%>) (*AsyncApi, error) {
+	<% if (hasPublisher && usePostbox) { -%>
+	if err := postboxConfig.setDefaultsAndValidate(); err != nil {
+		return nil, err
+	}
+
+	<%- } -%>
 	return &AsyncApi {
-		<% if (hasPublisher) { -%>
+		<% if (hasPublisher && !usePostbox) { -%>
 		publisher: publisher,
 		<%- } -%>
+		<% if (hasPublisher && usePostbox) { -%>
+		postboxPublisher:  postboxPublisher{
+			publisher,
+			postboxConfig,
+		},
+		<%- } %>
 		<%- if (hasSubscriber) { -%>
 		subscriber: subscriber,
 		handlers: handlers,
 		<%- } %>
 
 		router: nil,
-	}
+	}, nil
 }
 
 
@@ -88,6 +112,18 @@ func (a *AsyncApi) Plugin(r *message.Router) error {
 	)
     	<%- } %>
 	<%- }) %>
+
+	<% if (hasPublisher && usePostbox) { -%>
+	// Forwarder is used to send messages from the sql table to the specified publisher
+	if postboxForwarder, err := forwarder.NewForwarder(a.postboxConfig.Subscriber, a.publisher, a.postboxConfig.Logger, forwarder.Config{
+		ForwarderTopic: a.postboxConfig.PostboxTopic,
+		Router: r,
+	}); err != nil {
+		return err
+	} else {
+		a.postboxForwarder = postboxForwarder
+	}
+	<%- } %>
 
 	return nil
 }
@@ -200,20 +236,22 @@ func (m <%= message.name %>MsgPayload) visit<%= sender.id %>SendMsg(uuid string)
 		<% }) %>
 // Publish message of operation <%= sender.id %> into channel <%= sender.channel.id %>
 		<%- if (sender.parameters.length > 0) { -%>
-func (a AsyncApi) Publish<%= sender.id %>(uuid string, message <%= sender.id %>SendMsg, param <%= sender.channel.id %>Param) error {
+func (a <%- if(!usePostbox) { -%>AsyncApi<%- } else { -%>postboxPublisher<%- } %>) Publish<%= sender.id %>(uuid string, message <%= sender.id %>SendMsg, param <%= sender.channel.id %>Param) error {
 	msg, err := message.visit<%= sender.id %>SendMsg(uuid)
 	if err != nil {
 		return err
 	}
 	address := marshalChannelAddress("<%= sender.channel.address %>", param)
+
 	return a.publisher.Publish(address, msg.Raw())
 }
 			<%- } else { -%>
-func (a AsyncApi) Publish<%= sender.id %>(uuid string, message <%= sender.id %>SendMsg) error {
+func (a <%- if(!usePostbox) { -%>AsyncApi<%- } else { -%>postboxPublisher<%- } %>) Publish<%= sender.id %>(uuid string, message <%= sender.id %>SendMsg) error {
 	msg, err := message.visit<%= sender.id %>SendMsg(uuid)
 	if err != nil {
 		return err
 	}
+
 	return a.publisher.Publish("<%= sender.channel.address %>", msg.Raw())
 }
 		<% } -%>

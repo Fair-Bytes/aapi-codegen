@@ -1,0 +1,14 @@
+{
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 5432,
+            "driver": "PostgreSQL",
+            "name": "aapi_codegen test db",
+            "database": "aapicodegen_db",
+            "password": "aapicodegen_pass",
+            "username": "aapicodegen_user"
+        }
+    ],
+}

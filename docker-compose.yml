@@ -1,0 +1,12 @@
+services:
+
+  postgres:
+    image: 'postgres:latest'
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=aapicodegen_user
+      - POSTGRES_PASSWORD=aapicodegen_pass
+      - POSTGRES_DB=aapicodegen_db
+
