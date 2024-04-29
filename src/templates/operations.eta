@@ -10,6 +10,13 @@ package <%= it.package %>
 	var hasSubscriber = it.receivers.length > 0
 	var hasPublisher  = it.senders.length > 0
 	var usePostbox = !!it.postbox
+
+	// Generate arguments for NewAsyncApi
+	var newAsyncApiArgsList = []
+	if (hasPublisher) { newAsyncApiArgsList.push("publisher message.Publisher") }
+	if (hasSubscriber) { newAsyncApiArgsList.push("subscriber message.Subscriber, handlers AsyncApiInterface") }
+	if (hasPublisher && usePostbox) { newAsyncApiArgsList.push("postboxConfig PostboxConfig") }
+	var newAsyncApiArgs = newAsyncApiArgsList.join(", ")
 %>
 
 import (
@@ -72,10 +79,7 @@ type AsyncApi struct {
 	router *message.Router
 }
 
-func NewAsyncApi(<%-
-		if (hasPublisher) { -%>publisher message.Publisher<% } -%>
-	<%- if (hasSubscriber) { -%>, subscriber message.Subscriber, handlers AsyncApiInterface<% } -%>
-	<%- if (hasPublisher && usePostbox) { -%>, postboxConfig PostboxConfig<%- } -%>) (*AsyncApi, error) {
+func NewAsyncApi(<%= newAsyncApiArgs %>) (*AsyncApi, error) {
 	<% if (hasPublisher && usePostbox) { -%>
 	postboxPublisher, err := newPostboxPublisher(publisher, postboxConfig)
 	if err != nil {

@@ -1,6 +1,6 @@
 {
   "name": "@fair-bytes/aapi-codegen",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Generate go files from asyncapi spec",
   "main": "./dist/aapi-codegen.js",
   "bin": {
